@@ -1,0 +1,1056 @@
+---
+title: "BAL_analyses"
+author: "Amit Upadhyay"
+date: "6/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+setwd("/data/runs/Analysis/CovTen_AU/BAL_2022_final2")
+options(future.globals.maxSize= 33554432000) # 32000*1024^2
+
+# apt-get install libxt-dev libcairo2-dev
+# install.packages("ggrastr")
+
+# library(devtools)
+# install_github("YuLab-SMU/clusterProfiler")
+
+library(Seurat)
+library(SingleR)
+library(stringr)
+library(ggplot2)
+library(ggrastr)
+library(SingleCellExperiment)
+library(dplyr)
+library(tidyr)
+library(openxlsx)
+library(magrittr)
+library(msigdbr)
+library(patchwork)
+library(RColorBrewer)
+library("openxlsx")
+
+
+```
+
+```{r input}
+# data_path <- "/data/runs/210524_A00945_0114_AHYWLMDSXY/HYWLMDSXY/outs/fastq_path/p21061_Tim"  
+
+bal_orig <- readRDS("/data/runs/Analysis/CovTen_AU/BAL_2022/BAL.integrated_Jul2nd.rds")
+
+bal_orig$AnimalID <- "NA"
+
+# Fix sample name in object, name also corrected in data path
+bal_orig$orig.ident[bal_orig$orig.ident == "p21061_s006_CD68-KV31_D4"] <- "p21061_s006_RMs8-CD68_D4" 
+bal_orig$Animal1[bal_orig$orig.ident == "p21061_s006_RMs8-CD68_D4"] <- "RMs8"
+bal_orig$Animal2[bal_orig$orig.ident == "p21061_s006_RMs8-CD68_D4"] <- "CD68"
+bal_orig$hashing[bal_orig$orig.ident == "p21061_s006_RMs8-CD68_D4"] <- "RMs8-CD68"
+
+bal_orig@meta.data[bal_orig$orig.ident == "p21061_s006_RMs8-CD68_D4",]
+
+# Group 1
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s001_RMs8-GR1_BL"]  <- "RMs8"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s002_CD68-GR1_BL"]  <- "CD68"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s003_RMj8-KV31_BL" & bal_orig$HTO_classification =="Hash3Human"] <- "RMj8"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s003_RMj8-KV31_BL" & bal_orig$HTO_classification =="Hash4Human"] <- "KV31"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s004_RMs8-CD68_D2" & bal_orig$HTO_classification =="Hash1Human"] <- "RMs8"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s004_RMs8-CD68_D2" & bal_orig$HTO_classification =="Hash2Human"] <- "CD68"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s005_RMj8-KV31_D2" & bal_orig$HTO_classification =="Hash3Human"] <- "RMj8"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s005_RMj8-KV31_D2" & bal_orig$HTO_classification =="Hash4Human"] <- "KV31"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s006_RMs8-CD68_D4" & bal_orig$HTO_classification =="Hash1Human"] <- "RMs8"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s006_RMs8-CD68_D4" & bal_orig$HTO_classification =="Hash2Human"] <- "CD68"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s007_RMj8-KV31_D4" & bal_orig$HTO_classification =="Hash3Human"] <- "RMj8"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s007_RMj8-KV31_D4" & bal_orig$HTO_classification =="Hash4Human"] <- "KV31"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s008_KV31-CD68_D7" & bal_orig$HTO_classification =="Hash2Human"] <- "CD68"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s008_KV31-CD68_D7" & bal_orig$HTO_classification =="Hash4Human"] <- "KV31"
+
+
+# Group 2
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s009_RRc17-RGo9_BL" & bal_orig$HTO_classification =="Hash1Human"] <- "RRc17"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s009_RRc17-RGo9_BL" & bal_orig$HTO_classification =="Hash2Human"] <- "RGo9"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s010_RCk17-RRj11_BL" & bal_orig$HTO_classification =="Hash3Human"] <- "RCk17"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s010_RCk17-RRj11_BL" & bal_orig$HTO_classification =="Hash4Human"] <- "RRj11"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s011_RRc17-RGo9_D2" & bal_orig$HTO_classification =="Hash1Human"] <- "RRc17"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s011_RRc17-RGo9_D2" & bal_orig$HTO_classification =="Hash2Human"] <- "RGo9"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s012_RCk17-RRj11_D2" & bal_orig$HTO_classification =="Hash3Human"] <- "RCk17"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s012_RCk17-RRj11_D2" & bal_orig$HTO_classification =="Hash4Human"] <- "RRj11"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s013_RRc17-RGo9_D4" & bal_orig$HTO_classification =="Hash1Human"] <- "RRc17"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s013_RRc17-RGo9_D4" & bal_orig$HTO_classification =="Hash2Human"] <- "RGo9"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s014_RCk17-RRj11_D4" & bal_orig$HTO_classification =="Hash3Human"] <- "RCk17"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s014_RCk17-RRj11_D4" & bal_orig$HTO_classification =="Hash4Human"] <- "RRj11"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s015_RGo9-RRj11_D7" & bal_orig$HTO_classification =="Hash2Human"] <- "RGo9"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s015_RGo9-RRj11_D7" & bal_orig$HTO_classification =="Hash4Human"] <- "RRj11"
+
+# Group 3
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s016_LG92-LC10_BL" & bal_orig$HTO_classification =="Hash1Human"] <- "LG92"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s016_LG92-LC10_BL" & bal_orig$HTO_classification =="Hash2Human"] <- "LC10"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s017_RNi17-RZs14_BL" & bal_orig$HTO_classification =="Hash3Human"] <- "RNi17"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s017_RNi17-RZs14_BL" & bal_orig$HTO_classification =="Hash4Human"] <- "RZs14"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s018_LG92-LC10_D2" & bal_orig$HTO_classification =="Hash1Human"] <- "LG92"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s018_LG92-LC10_D2" & bal_orig$HTO_classification =="Hash2Human"] <- "LC10"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s019_RNi17-RZs14_D2" & bal_orig$HTO_classification =="Hash3Human"] <- "RNi17"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s019_RNi17-RZs14_D2" & bal_orig$HTO_classification =="Hash4Human"] <- "RZs14"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s020_LG92-LC10_D4" & bal_orig$HTO_classification =="Hash1Human"] <- "LG92"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s020_LG92-LC10_D4" & bal_orig$HTO_classification =="Hash2Human"] <- "LC10"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s021_RNi17-RZs14_D4" & bal_orig$HTO_classification =="Hash3Human"] <- "RNi17"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s021_RNi17-RZs14_D4" & bal_orig$HTO_classification =="Hash4Human"] <- "RZs14"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s024_LC10-RZs14_D7" & bal_orig$HTO_classification =="Hash2Human"] <- "LC10"
+bal_orig$AnimalID[bal_orig$orig.ident=="p21061_s024_LC10-RZs14_D7" & bal_orig$HTO_classification =="Hash4Human"] <- "RZs14"
+
+
+bal_orig$AnimalID_Day <- paste0(bal_orig$AnimalID,"_",bal_orig$Day)
+
+saveRDS(bal_orig,"bal_orig_addAnimalID.rds")
+
+bal_orig <- readRDS("bal_orig_addAnimalID.rds")
+
+```
+
+```{r remove_samples}
+
+d <- as.data.frame(table(bal_orig$AnimalID_Day))
+d[order(d$Freq),]
+
+list_bal <- SplitObject(bal_orig, split.by = "AnimalID_Day")
+for (i in names(list_bal)) {
+  DefaultAssay(list_bal[[i]]) <- "RNA"
+  list_bal[[i]]  <- DietSeurat(list_bal[[i]], counts = TRUE, data = TRUE, scale.data = FALSE, assays = "RNA")
+  list_bal[[i]] <- SCTransform(list_bal[[i]], verbose = FALSE)
+}
+saveRDS(list_bal,"list_bal.rds")
+
+# Remove:
+
+list_bal <- readRDS("list_bal.rds")
+
+names(list_bal)
+list_bal2 <- list_bal
+list_bal2["RNi17_D4"] <- NULL # as it has low number of cells (48)
+list_bal2["RZs14_D7"] <- NULL # as it has low number of cells (186)
+list_bal2["CD68_BL"] <- NULL # unusally high epithelial cells
+names(list_bal2)
+
+saveRDS(list_bal2,"list_bal_rm_samples.rds")
+
+```
+
+```{r integrate}
+
+list_bal2 <- readRDS("list_bal_rm_samples.rds")
+
+bal.features <- SelectIntegrationFeatures(object.list = list_bal2, normalization.method = "SCT",nfeatures = 3000, verbose = FALSE) 
+bal.list <- PrepSCTIntegration(list_bal2, anchor.features = bal.features, verbose = FALSE)
+bal.list <- lapply(X = bal.list, FUN = RunPCA, features = bal.features)
+anchors <- FindIntegrationAnchors(bal.list, normalization.method = "SCT",anchor.features = bal.features,
+                                  reduction = "rpca", verbose = F, dims = 1:30)
+
+
+sort(unique(bal$AnimalID_Day_Group))
+
+saveRDS(anchors,"anchors.rds")
+
+bal <- IntegrateData(anchorset = anchors, normalization.method = "SCT", verbose = FALSE)  
+
+DefaultAssay(bal) <- "integrated"
+bal <- RunPCA(bal, verbose = FALSE)
+bal <- RunUMAP(bal, dims = 1:30, verbose = FALSE)
+bal <- FindNeighbors(bal, dims = 1:30, verbose = FALSE)
+bal <- FindClusters(bal, verbose = FALSE, resolution = c(0.1,0.25,0.5,0.75,1))
+
+p1 <- DimPlot(bal, group.by = "singleR_main", label = T)
+p2 <- DimPlot(bal, group.by = "integrated_snn_res.0.5", label= T)
+p1 + p2
+
+library(patchwork)
+DefaultAssay(bal) <- "RNA"
+Idents(bal) <- "integrated_snn_res.1"
+p1 <- DimPlot(bal, label = T) & NoAxes() & NoLegend() 
+p2 <- DotPlot(bal,features = c("CD163","CD68","APOE","CD3D","CD3E","NKG7","CCR7","LAMP3","MARCKSL1","KIT","FCER1A","CST6","TPPP3","LRRIQ1","FLT3","CD1C","CLEC9A","CCDC50","SELL","IRF8","MS4A1","CD79A","SCGB3A1","SCGB1A1","GZMB","MAMU-DRA","MAMU-DRB1","IL1RN","IFIT3","SOD2","CSF3R","MARCO","CHIT1","MRC1","TREM2","APOBEC3A","CD14","FCGR3")) + RotatedAxis() +
+  theme(axis.text.x = element_text(color = "black",size = 11, angle = 45, hjust = 1))
+p1 + p2 +  plot_layout(widths = c(1, 2))
+
+saveRDS(bal,"bal_reciprocal_dim30.rds")
+
+DimPlot(bal,group.by = "singleR_main", split.by = "singleR_main",ncol = 4)
+
+Idents(bal) <- "singleR_main"
+DotPlot(bal,features = c("CD163","CD68","APOE","CD3D","CD3E","NKG7","CCR7","LAMP3","MARCKSL1","KIT","FCER1A","CST6","TPPP3","LRRIQ1","FLT3","CD1C","CLEC9A","CCDC50","SELL","IRF8","MS4A1","CD79A","SCGB3A1","SCGB1A1","GZMB","MAMU-DRA","MAMU-DRB1","IL1RN","IFIT3","SOD2","CSF3R","MARCO","CHIT1","MRC1","TREM2","APOBEC3A","CD14","FCGR3")) + RotatedAxis() +
+  theme(axis.text.x = element_text(color = "black",size = 11, angle = 45, hjust = 1))
+
+```
+
+```{r annotate_type1}
+bal <- readRDS("bal_reciprocal_dim30.rds")
+
+DimPlot(bal, group.by = "integrated_snn_res.1", label = T) & NoLegend()
+
+bal$Type1 <- "Myeloid"
+bal$Type1[bal$integrated_snn_res.1 == 13] <- "Lymphocytes"
+bal$Type1[bal$integrated_snn_res.1 == 26] <- "Lymphocytes"
+bal$Type1[bal$integrated_snn_res.1 == 21] <- "Epithelial"
+bal$Type1[bal$integrated_snn_res.1 == 27] <- "Epithelial"
+```
+
+```{r annotate_manual}
+bal$Manual <- "Macrophages/Monocytes"
+bal$Manual[bal$integrated_snn_res.1 == 13] <- "T/NK cells"
+bal$Manual[bal$integrated_snn_res.1 == 26] <- "B cells"
+bal$Manual[bal$integrated_snn_res.1 == 21] <- "Ciliated epithelia"
+bal$Manual[bal$integrated_snn_res.1 == 27] <- "Club epithelia"
+bal$Manual[bal$integrated_snn_res.1 == 22] <- "Mast"
+bal$Manual[bal$integrated_snn_res.1 == 25] <- "pDC"
+bal$Manual[bal$integrated_snn_res.1 == 20] <- "Activated mDC"
+bal$Manual[bal$integrated_snn_res.1 == 24] <- "mDC"
+bal$Manual[bal$singleR_main == "Neutrophils"] <- "Neutrophils"
+
+bal$Treatment[bal$Treatment == "IFnant"] <- "IFNmod"
+
+DimPlot(bal,group.by = "Manual")
+
+```
+
+```{r plot_umap}
+
+# All cells
+
+bal$CellType <- bal$Manual
+
+bal$CellType <- factor(bal$CellType,
+                       levels = c("Macrophages/Monocytes","mDC","Activated mDC","T/NK cells","Mast","pDC","B cells","Neutrophils","Ciliated epithelia","Club epithelia"))
+unique(bal$CellType)
+
+bal$Day_Treatment <- paste0(bal$Day," ",bal$Treatment)
+bal$Treatment_Day <- paste0(bal$Treatment," ",bal$Day)
+bal$Group <- bal$Treatment
+
+
+library(RColorBrewer)
+
+Idents(bal) <- "CellType"
+
+DimPlot(bal,raster = T, cols = colorRampPalette(brewer.pal(name="Set1", n = 8))(15)[1:15], pt.size = 1) & NoAxes() 
+
+
+DimPlot(bal,raster = T, split.by = "Treatment_Day", ncol = 4,
+        cols = colorRampPalette(brewer.pal(name="Set1", n = 8))(15)[1:15], pt.size = 1) & NoAxes()
+
+
+DimPlot(bal,raster = T, group.by = "integrated_snn_res.1", label = T) + NoLegend() + NoAxes()
+
+DimPlot(bal,raster = T, group.by = "CellType", label = T, repel = T,
+              cols = colorRampPalette(brewer.pal(name="Set1", n = 8))(15)[1:15], pt.size = 1) & NoAxes() & NoLegend()
+
+
+DefaultAssay(bal) <- "RNA"
+
+Idents(bal) <- "integrated_snn_res.1"
+DotPlot(bal,features = c("CD163","CD68","APOE","MARCO","CD14","FCGR3","MAMU-DRA","MAMU-DRB1","CD3D","CD3E","NKG7","CCR7","LAMP3","MARCKSL1","CST6","TPPP3","LRRIQ1","KIT","FCER1A","FLT3","CD1C","CLEC9A","CCDC50","SELL","IRF8","MS4A1","CD79A","SCGB3A1","SCGB1A1","IFIT3","SOD2","S100A8","CSF3R"), dot.scale = 4, assay = "RNA") + RotatedAxis() +
+  theme(axis.text.x = element_text(color = "black",size = 11, angle = 45, hjust = 1))
+
+
+Idents(bal) <- "CellType"
+DotPlot(bal,features = c("CD163","CD68","APOE","MARCO","CD14","FCGR3","MAMU-DRA","MAMU-DRB1","CD3D","CD3E","NKG7","CCR7","LAMP3","MARCKSL1","CST6","TPPP3","LRRIQ1","KIT","FCER1A","FLT3","CD1C","CLEC9A","CCDC50","SELL","IRF8","MS4A1","CD79A","SCGB3A1","SCGB1A1","IFIT3","SOD2","S100A8","CSF3R"), dot.scale = 4, assay = "RNA") + RotatedAxis() +
+  theme(axis.text.x = element_text(color = "black",size = 11, angle = 45, hjust = 1))
+
+
+```
+
+```{r proportions_all}
+
+
+bal$AnimalID_Day_Group <- paste0(bal$AnimalID,"_",bal$Day,"_",bal$Treatment)
+
+d <- as.data.frame(as.matrix(prop.table(table(bal$AnimalID_Day_Group,bal$CellType),1) * 100))
+head(d)
+names(d) <- c("Sample","Type","Percentage")
+d <- d %>% separate(col=Sample, into = c("AnimalID","Timepoint","Group"), sep="_", remove = F)
+
+
+d$Group[d$Group == "Control"] <- "Untreated"
+d$Timepoint[d$Timepoint == "BL"] <- "-7"
+d$Timepoint[d$Timepoint == "D2"] <- "2"
+d$Timepoint[d$Timepoint == "D4"] <- "4"
+d$Timepoint[d$Timepoint == "D7"] <- "7"
+
+d$Timepoint <- factor(d$Timepoint, levels = c("-7","2","4","7"))
+
+
+p1 <- ggplot(d, aes(fill=Group, y=Percentage, x=Timepoint, group = Group)) + 
+  geom_jitter(shape = 21, size = 3.5, alpha = 0.8, position = position_dodge(width=0.8)) +
+  scale_fill_manual(values=c("#00578b","#ff8c69")) +
+  scale_y_continuous(expand=expansion(mult=c(0.1,0.3))) +
+  stat_summary(fun= median, fun.min = median, fun.max = median,
+               geom = "crossbar", width = 0.8, color = "black", size = 0.3,
+               position=position_dodge(width = 0.8)) +
+  theme_bw() + ylab("Percentage of all cells") + xlab("dpi") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  theme(text = element_text(size=14),
+        axis.text.x = element_text(size=12, color = "black"),
+        axis.text.y = element_text(size=12, color = "black")) +
+  theme(strip.background =element_rect(fill="white")) +
+  facet_wrap(~Type,ncol = 5,  scales = "free_y")
+p1
+ggsave(plot = p1, filename = "/data/runs/Analysis/CovTen_AU/BAL_2022_final2/Proportions_All_Supp.pdf", height= 5, width = 12.5, units = "in")
+
+table(bal$AnimalID,bal$Day)
+
+d$Type_Time_Group <- paste0(d$Type,"_",d$Timepoint,"_",d$Group)
+d$Type_Time <- paste0(d$Type,"_",d$Timepoint)
+
+list_pval <- list()
+get_pval <- function(type_time){
+  p <- wilcox.test(d[d$Type_Time_Group == paste0(type_time,"_Untreated"),]$Percentage,d[d$Type_Time_Group == paste0(type_time,"_IFNmod"),]$Percentage, paired = F, correct =F)$p.value
+  list_pval[[type_time]] <<- p
+}
+lapply(unique(d$Type_Time),get_pval)
+
+list_pval
+
+```
+
+```{r Dotplots_all}
+
+isg <- c("CXCL10","GBP1","GBP2","IFI27","IFI44L","IFI6","IFIT2","IFIT3","IFIT5","IRF7","ISG15","ISG20","MX1","MX2","OAS1","OAS2","OAS3","RSAD2","STAT1")
+
+cytokines <- c("IFNB1","IFNG","IL10","IL15","IL1B","IL6","IL7","TNF")
+
+chemokines <- c("CCL2","CCL20","CCL22","CCL3","CCL4L1","CCL5","CCL7","CCL8","CXCL10","CXCL11","CXCL3","CXCL8","CXCL9")
+
+inflammasome <- c("IL27","IL1RN","IL1B","IL18","NLRP3","GSDMD","CASP1","AIM2")
+
+receptors <- c("ACE2","TMPRSS2","CD209","CLEC4M","SIGLEC1","NRP1","CLEC4G","ASGR1","CD207","CLEC10A","TTYH2","FCGR3","FCGR2A","FCGR1A")
+
+
+# All days myeloid
+  
+
+bal_myeloid <- subset(bal, cells= row.names(bal@meta.data[bal$Type1 == "Myeloid" & bal$CellType != "Neutrophils",]))
+DefaultAssay(bal_myeloid) <-"RNA"
+bal_myeloid <- NormalizeData(bal_myeloid, verbose = F)
+bal_myeloid <- FindVariableFeatures(bal_myeloid, selection.method = "vst", verbose = F)
+bal_myeloid <- ScaleData(bal_myeloid, verbose = F)
+
+bal_myeloid$Type_Day_Group <- paste0(bal_myeloid$CellType,"\n",bal_myeloid$Day_Treatment)
+bal_myeloid$Type_Day_Group1 <- factor(bal_myeloid$Type_Day_Group, 
+                                     levels =c("Macrophages/Monocytes\nBL Control","Macrophages/Monocytes\nBL IFNmod","Macrophages/Monocytes\nD2 Control","Macrophages/Monocytes\nD2 IFNmod","Macrophages/Monocytes\nD4 Control","Macrophages/Monocytes\nD4 IFNmod","Macrophages/Monocytes\nD7 Control","Macrophages/Monocytes\nD7 IFNmod",
+                                               "pDC\nBL Control","pDC\nBL IFNmod","pDC\nD2 Control","pDC\nD2 IFNmod","pDC\nD4 Control","pDC\nD4 IFNmod","pDC\nD7 Control","pDC\nD7 IFNmod",
+                                               "mDC\nBL Control","mDC\nBL IFNmod","mDC\nD2 Control","mDC\nD2 IFNmod","mDC\nD4 Control","mDC\nD4 IFNmod","mDC\nD7 Control","mDC\nD7 IFNmod",
+                                               "Activated mDC\nBL Control","Activated mDC\nBL IFNmod","Activated mDC\nD2 Control","Activated mDC\nD2 IFNmod","Activated mDC\nD4 Control","Activated mDC\nD4 IFNmod","Activated mDC\nD7 Control","Activated mDC\nD7 IFNmod",
+                                               "Mast\nBL Control","Mast\nBL IFNmod","Mast\nD2 Control","Mast\nD2 IFNmod","Mast\nD4 Control","Mast\nD4 IFNmod","Mast\nD7 Control","Mast\nD7 IFNmod"
+                                    ))
+
+
+unique(bal_myeloid$Type_Day_Group)
+unique(bal_myeloid$Type_Day_Group1)
+
+
+Idents(bal_myeloid) <- "Type_Day_Group1"
+p <- DotPlot(bal_myeloid, features = unique(c(isg,cytokines,chemokines,inflammasome,receptors)),dot.scale = 4) +
+  geom_point(aes(size=pct.exp), shape = 21, colour="black", stroke=0.5) +
+  coord_flip(clip = "off") +
+scale_y_discrete(labels = rep(c("-","+"),20)) +
+  scale_colour_gradient2(low = "blue", mid = "white", high = "red") +
+  theme(axis.text.x = element_text(size=14, color = rep(c("#ff8c69","#00578b"),20))) +
+  theme(axis.text.y = element_text(size=11, color = "black")) +
+  geom_hline(yintercept = seq(2.5,40,by=2), linetype="dashed") +
+  geom_hline(yintercept = seq(8.5,41,by=8)) +
+  geom_vline(xintercept = c(17.5,25.5,37.5,44.5,56.5,57.5)) +
+  theme(plot.margin = unit(c(1,1,1,1), "cm")) +
+  annotate("text", x = 57, y = seq(1.5,40, by = 2), 
+           label = rep(c("baseline","2 dpi","4 dpi","7 dpi"),5)) +
+  annotate("text", x = 58, y = seq(4.5,40, by = 8), 
+           label = c("Macrophages/Monocytes","pDC","mDC","Activated mDC","Mast")) 
+
+p
+ggsave(plot = p, filename = "Myeloid_Dotplots.pdf", height = 10, width = 14, units = "in")
+
+
+# All days lymphoid
+
+bal_lymphoid <- subset(bal, cells= row.names(bal@meta.data[bal$Type1 == "Lymphocytes",]))
+DefaultAssay(bal_lymphoid) <-"RNA"
+bal_lymphoid <- NormalizeData(bal_lymphoid, verbose = F)
+bal_lymphoid <- FindVariableFeatures(bal_lymphoid, selection.method = "vst", verbose = F)
+bal_lymphoid <- ScaleData(bal_lymphoid, verbose = F)
+
+bal_lymphoid$Type_Day_Group <- paste0(bal_lymphoid$CellType,"\n",bal_lymphoid$Day_Treatment)
+
+sort(unique(bal_lymphoid$Type_Day_Group))
+
+bal_lymphoid$Type_Day_Group <- factor(bal_lymphoid$Type_Day_Group, 
+                                     levels =c("B cells\nBL Control",
+                                               "B cells\nBL IFNmod",
+                                               "B cells\nD2 Control",
+                                               "B cells\nD2 IFNmod",
+                                               "B cells\nD4 Control",
+                                               "B cells\nD4 IFNmod",
+                                               "B cells\nD7 Control",
+                                               "B cells\nD7 IFNmod",
+                                               "T/NK cells\nBL Control",
+                                               "T/NK cells\nBL IFNmod",
+                                               "T/NK cells\nD2 Control",
+                                               "T/NK cells\nD2 IFNmod",
+                                               "T/NK cells\nD4 Control",
+                                               "T/NK cells\nD4 IFNmod",
+                                               "T/NK cells\nD7 Control",
+                                               "T/NK cells\nD7 IFNmod"))
+
+Idents(bal_lymphoid) <- "Type_Day_Group"
+
+p <- DotPlot(bal_lymphoid, features = unique(c(isg,cytokines,chemokines,inflammasome,receptors)), dot.scale = 4) + 
+  geom_point(aes(size=pct.exp), shape = 21, colour="black", stroke=0.5) +
+  coord_flip(clip = "off") +
+  scale_y_discrete(labels = rep(c("-","+"),16)) +
+  scale_colour_gradient2(low = "blue", mid = "white", high = "red") +
+  theme(axis.text.x = element_text(size=14, color = rep(c("#ff8c69","#00578b"),20))) +
+  theme(axis.text.y = element_text(size=11, color = "black")) +
+  geom_hline(yintercept = seq(2.5,16,by=2), linetype="dashed") +
+  geom_hline(yintercept = seq(8.5,17,by=8)) +
+  geom_vline(xintercept = c(17.5,25.5,37.5,44.5,56.5,57.5)) +
+  theme(plot.margin = unit(c(1,1,1,1), "cm")) +
+  annotate("text", x = 57, y = seq(1.5,17, by = 2), 
+           label = rep(c("baseline","2 dpi","4 dpi","7 dpi"),2)) +
+  annotate("text", x = 58, y = seq(4.5,17, by = 8), 
+           label = c("B cells","T/NK cells")) 
+
+
+ggsave(plot = p, filename = "Lymphoid_Dotplots.pdf", height = 10, width = 8, units = "in")
+
+
+# All days epithelial
+
+bal_epithelial <- subset(bal, cells= row.names(bal@meta.data[bal$Type1 == "Epithelial",]))
+DefaultAssay(bal_epithelial) <-"RNA"
+bal_epithelial <- NormalizeData(bal_epithelial, verbose = F)
+bal_epithelial <- FindVariableFeatures(bal_epithelial, selection.method = "vst", verbose = F)
+bal_epithelial <- ScaleData(bal_epithelial, verbose = F)
+
+bal_epithelial$Type_Day_Group <- paste0(bal_epithelial$CellType,"\n",bal_epithelial$Day_Treatment)
+
+sort(unique(bal_epithelial$Type_Day_Group))
+
+bal_epithelial$Type_Day_Group1 <- factor(bal_epithelial$Type_Day_Group, 
+                                      levels =c("Ciliated epithelia\nBL Control","Ciliated epithelia\nBL IFNmod","Ciliated epithelia\nD2 Control","Ciliated epithelia\nD2 IFNmod","Ciliated epithelia\nD4 Control","Ciliated epithelia\nD4 IFNmod","Ciliated epithelia\nD7 Control","Ciliated epithelia\nD7 IFNmod",
+                                                "Club epithelia\nBL Control","Club epithelia\nBL IFNmod","Club epithelia\nD2 Control","Club epithelia\nD2 IFNmod","Club epithelia\nD4 Control","Club epithelia\nD4 IFNmod","Club epithelia\nD7 Control","Club epithelia\nD7 IFNmod" ))
+
+Idents(bal_epithelial) <- "Type_Day_Group1"
+
+p <- DotPlot(bal_epithelial, features = unique(c(isg,cytokines,chemokines,inflammasome,receptors)), dot.scale = 4) + 
+  geom_point(aes(size=pct.exp), shape = 21, colour="black", stroke=0.5) +
+  coord_flip(clip = "off") +
+  scale_y_discrete(labels = rep(c("-","+"),16)) +
+  scale_colour_gradient2(low = "blue", mid = "white", high = "red") +
+  theme(axis.text.x = element_text(size=14, color = rep(c("#ff8c69","#00578b"),20))) +
+  theme(axis.text.y = element_text(size=11, color = "black")) +
+  geom_hline(yintercept = seq(2.5,16,by=2), linetype="dashed") +
+  geom_hline(yintercept = seq(8.5,17,by=8)) +
+  geom_vline(xintercept = c(17.5,25.5,37.5,44.5,56.5,57.5)) +
+  theme(plot.margin = unit(c(1,1,1,1), "cm")) +
+  annotate("text", x = 57, y = seq(1.5,17, by = 2), 
+           label = rep(c("baseline","2 dpi","4 dpi","7 dpi"),2)) +
+  annotate("text", x = 58, y = seq(4.5,17, by = 8), 
+           label = c("Ciliated epithelia","Club epithelia")) 
+
+ggsave(plot = p, filename = "Epithelial_Dotplots.pdf", height = 10, width = 8, units = "in")
+
+
+```
+
+```{r get_macrophages_monocytes}
+
+bal$Manual2 <- "NA"
+plot <- DimPlot(bal, group.by = "Manual", label = TRUE)
+select.cells <- CellSelector(plot = plot)
+bal@meta.data[select.cells,]$Manual2 <- "Myeloid_cluster"
+
+saveRDS(bal,"bal_reciprocal_dim30_Group_Manual.rds")
+
+bal_macro_mono <- subset(bal, cells = row.names(bal@meta.data[bal$Manual == "Macrophages/Monocytes" & bal$Manual2 == "Myeloid_cluster",]))
+
+list_bal_macro_mono <- SplitObject(bal_macro_mono, split.by = "AnimalID_Day")
+
+for (i in names(list_bal_macro_mono)) {
+  DefaultAssay(list_bal_macro_mono[[i]]) <- "RNA"
+  list_bal_macro_mono[[i]]  <- DietSeurat(list_bal_macro_mono[[i]], counts = TRUE, data = TRUE, scale.data = FALSE, assays = "RNA")
+  list_bal_macro_mono[[i]] <- SCTransform(list_bal_macro_mono[[i]], verbose = FALSE)
+}
+
+saveRDS(list_bal_macro_mono,"list_bal_macro_mono.rds") 
+
+```
+
+```{r map_healthy_lungs}
+
+lungs_ref <- readRDS("/data/runs/Analysis/COVID_NHP_Study1/R4_10X_Seuratv4_v2/Lung/Lungs_int3.rds")
+DefaultAssay(lungs_ref) <- "integrated"
+lungs_ref <- RunUMAP(lungs_ref, dims = 1:30, reduction = "pca", return.model = TRUE)
+
+lungs_ref$celltype[lungs_ref$celltype == "CD163+MRC1+\nMac"] <- "CD163+MRC1+"
+lungs_ref$celltype[lungs_ref$celltype == "CD163+MRC1+\nTREM2+ Mac"] <- "CD163+MRC1+TREM2+"
+lungs_ref$celltype[lungs_ref$celltype == "CD163+MRC1-\nMac"] <- "CD163+MRC1-"
+lungs_ref$celltype[lungs_ref$celltype == "CD16+\nMono"] <- "CD16+ Mono"
+
+lapply(list_bal_macro_mono,DefaultAssay)
+
+anchors <- list()
+for (i in 1:length(list_bal_macro_mono)) {
+  anchors[[i]] <- FindTransferAnchors(
+    reference = lungs_ref,
+    query = list_bal_macro_mono[[i]],
+    reference.reduction = "pca", 
+    dims = 1:30
+  )
+}
+
+for (i in 1:length(list_bal_macro_mono)) {
+  list_bal_macro_mono[[i]] <- MapQuery(
+    anchorset = anchors[[i]], 
+    query = list_bal_macro_mono[[i]],
+    reference = lungs_ref,
+    refdata = list(celltype = "celltype"),
+    reference.reduction = "pca",
+    reduction.model = "umap"
+  )
+}
+
+bal_lungref <- merge(list_bal_macro_mono[[1]], list_bal_macro_mono[2:length(list_bal_macro_mono)], merge.dr = "ref.umap")
+DimPlot(bal_lungref, group.by = "predicted.celltype")
+DimPlot(bal_lungref, split.by = "predicted.celltype",group.by = "predicted.celltype", ncol = 2)
+
+
+DefaultAssay(bal_lungref) <- "RNA"
+bal_lungref <- NormalizeData(bal_lungref)
+bal_lungref <- FindVariableFeatures(bal_lungref, selection.method = "vst")
+bal_lungref <- ScaleData(bal_lungref)
+
+
+bal_lungref$predicted.celltype <- factor(bal_lungref$predicted.celltype, levels = c("CD163+MRC1+","CD163+MRC1+TREM2+","CD163+MRC1-","CD16+ Mono"))
+
+Idents(bal_lungref) <- "predicted.celltype1"
+VlnPlot(bal_lungref, features = "predicted.celltype.score",cols = c("#045a8d","#a50f15","#fb6a4a","#fec44f")) + NoLegend()
+
+saveRDS(bal_lungref,"bal_lungref.rds")
+
+DimPlot(bal_lungref, split.by = "predicted.celltype1",group.by = "predicted.celltype", ncol = 5, raster = T, cols = c("#045a8d","#a50f15","#fb6a4a","#fec44f")) & NoAxes() & NoLegend()
+
+```
+
+```{r plot_umap macrophages subsets}
+
+# Macrophage subsets
+
+bal_lungref$Treatment_Day <- paste0(bal_lungref$Treatment," ",bal_lungref$Day)
+
+DimPlot(bal_lungref, split.by = "Treatment_Day",group.by = "predicted.celltype", ncol = 4, raster = T, cols = c("#045a8d","#a50f15","#fb6a4a","#fec44f"), pt.size = 2) & NoAxes()
+
+DimPlot(bal_lungref, group.by = "predicted.celltype", raster = T, cols = c("#045a8d","#a50f15","#fb6a4a","#fec44f"), pt.size = 0.8) & NoAxes()
+
+
+VlnPlot(bal_lungref,features = c("CD163","MRC1","FABP4","MARCO","TREM2","LGMN","FCN1","APOBEC3A","CD14","FCGR3"), 
+      stack= T, flip = T, split.by = "predicted.celltype", group.by = "predicted.celltype") + NoLegend() +
+  ggplot2::scale_fill_manual(values = c("#045a8d","#a50f15","#fb6a4a","#fec44f")) +
+  theme(axis.text.x = element_text(angle=0, color = "black", hjust = 0.5)) + geom_jitter_rast(size = 0.4,alpha=0.1)
+
+```
+
+```{r proportions_macrophages}
+
+library(ggprism)
+library(rstatix)
+
+bal_lungref$AnimalID_Day_Group <- paste0(bal_lungref$AnimalID,"_",bal_lungref$Day,"_",bal_lungref$Treatment)
+
+prop.table(table(bal_lungref$AnimalID_Day_Group,bal_lungref$predicted.celltype),1) * 100
+
+d <- as.data.frame(as.matrix(prop.table(table(bal_lungref$AnimalID_Day_Group,bal_lungref$predicted.celltype),1) * 100))
+head(d)
+names(d) <- c("Sample","Type","Percentage")
+d <- d %>% separate(col=Sample, into = c("AnimalID","Timepoint","Group"), sep="_", remove = F)
+d$Type_Time_Group <- paste0(d$Type,"_",d$Timepoint,"_",d$Group)
+d$Type_Time <- paste0(d$Type,"_",d$Timepoint)
+d$Group_Time <- paste0(d$Group,"_",d$Timepoint)
+
+d$Type <- gsub(" Mac","",d$Type)
+d$Type <- gsub("TREM2","\nTREM2",d$Type)
+d$Type <- factor(d$Type, levels = c("CD163+MRC1+","CD163+MRC1+\nTREM2+","CD163+MRC1-","CD16+ Mono"))
+
+d$Timepoint[d$Timepoint == "BL"] <- "baseline"
+d$Timepoint[d$Timepoint == "D2"] <- "2 dpi"
+d$Timepoint[d$Timepoint == "D4"] <- "4 dpi"
+d$Timepoint[d$Timepoint == "D7"] <- "7 dpi"
+d$Timepoint <- factor(d$Timepoint, levels = c("baseline","2 dpi","4 dpi","7 dpi"))
+
+list_pval <- list()
+get_pval <- function(type_time){
+  p <- wilcox.test(d[d$Type_Time_Group == paste0(type_time,"_Control"),]$Percentage,d[d$Type_Time_Group == paste0(type_time,"_IFNmod"),]$Percentage, paired = F, correct =F)$p.value
+  list_pval[[type_time]] <<- p
+}
+lapply(unique(d$Type_Time),get_pval)
+
+list_pval
+
+df_manual <- data.frame(
+  group1 = c("Control", "Control"),
+  group2 = c("IFNmod", "IFNmod"),
+  p.adj = c(0.026, 0.009),
+  y.position = c(115, 115),
+  Timepoint = c("2 dpi", "2 dpi"),
+  Type = c("CD163+MRC1+", "CD163+MRC1-")
+  
+)
+
+ggplot(d, aes(y=Percentage, x=factor(Group))) + 
+  geom_point(size = 4, shape = 21, aes(fill= Group)) +
+  scale_x_discrete(labels = c("-","+")) +
+  scale_y_continuous(limits = c(0, 125),breaks = seq(0, 100, by = 25)) +
+  xlab("") +
+  scale_fill_manual(values=c("#ff8c69","#00578b")) +  # #FA8072 #005477
+  stat_summary(fun= median, fun.min = median, fun.max = median,
+               geom = "crossbar", width = 0.5, color = "black", size = 0.5) +
+  theme_bw() + ylab("Percentage of Macrophages & Monocytes") + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  theme(text = element_text(size=14),
+        axis.text.x = element_text(size=14, color = c("#ff8c69","#00578b")),
+        axis.text.y = element_text(size=12, color = "black")) +
+  theme(strip.background =element_rect(fill="white")) +
+  facet_grid(factor(Timepoint)~factor(Type)) +
+  add_pvalue(df_manual)
+
+
+write.table(d,"Proportions_macrophage_subsets_data.txt",quote = F,sep="\t")
+
+```
+
+```{r Dotplots_macrophages}
+
+isg <- c("CXCL10","GBP1","GBP2","IFI27","IFI44L","IFI6","IFIT2","IFIT3","IFIT5","IRF7","ISG15","ISG20","MX1","MX2","OAS1","OAS2","OAS3","RSAD2","STAT1")
+
+cytokines <- c("IFNB1","IFNG","IL10","IL15","IL1B","IL6","IL7","TNF")
+
+chemokines <- c("CCL2","CCL20","CCL22","CCL3","CCL4L1","CCL5","CCL7","CCL8","CXCL10","CXCL11","CXCL3","CXCL8","CXCL9")
+
+inflammasome <- c("IL27","IL1RN","IL1B","IL18","NLRP3","GSDMD","CASP1","AIM2")
+
+receptors <- c("ACE2","TMPRSS2","CD209","CLEC4M","SIGLEC1","NRP1","CLEC4G","ASGR1","CD207","CLEC10A","TTYH2","FCGR3","FCGR2A","FCGR1A")
+
+
+
+bal_lungref <- readRDS("bal_lungref.rds")
+bal_lungref_sub <- subset(bal_lungref, cells= row.names(bal_lungref@meta.data[bal_lungref$predicted.celltype != "CD16+ Mono",]))
+DefaultAssay(bal_lungref_sub) <-"RNA"
+bal_lungref_sub <- NormalizeData(bal_lungref_sub, verbose = F)
+bal_lungref_sub <- FindVariableFeatures(bal_lungref_sub, selection.method = "vst", verbose = F)
+bal_lungref_sub <- ScaleData(bal_lungref_sub, verbose = F)
+
+bal_lungref_sub$Day_Treatment <- paste0(bal_lungref_sub$Day," ",bal_lungref_sub$Treatment)
+bal_lungref_sub$Type_Day_Group <- paste0(bal_lungref_sub$predicted.celltype,"\n",bal_lungref_sub$Day_Treatment)
+
+sort(unique(bal_lungref_sub$Type_Day_Group))
+bal_lungref_sub$Type_Day_Group <- factor(bal_lungref_sub$Type_Day_Group, 
+                                     levels =c("CD163+MRC1+\nBL Control",
+                                               "CD163+MRC1+\nBL IFNmod",
+                                               "CD163+MRC1+\nD2 Control",
+                                               "CD163+MRC1+\nD2 IFNmod",
+                                               "CD163+MRC1+\nD4 Control",
+                                               "CD163+MRC1+\nD4 IFNmod",
+                                               "CD163+MRC1+\nD7 Control",
+                                               "CD163+MRC1+\nD7 IFNmod",
+                                               "CD163+MRC1+TREM2+\nBL Control",
+                                               "CD163+MRC1+TREM2+\nBL IFNmod",
+                                               "CD163+MRC1+TREM2+\nD2 Control",
+                                               "CD163+MRC1+TREM2+\nD2 IFNmod",
+                                               "CD163+MRC1+TREM2+\nD4 Control",
+                                               "CD163+MRC1+TREM2+\nD4 IFNmod",
+                                               "CD163+MRC1+TREM2+\nD7 Control",
+                                               "CD163+MRC1+TREM2+\nD7 IFNmod",
+                                               "CD163+MRC1-\nBL Control",
+                                               "CD163+MRC1-\nBL IFNmod",
+                                               "CD163+MRC1-\nD2 Control",
+                                               "CD163+MRC1-\nD2 IFNmod",
+                                               "CD163+MRC1-\nD4 Control",
+                                               "CD163+MRC1-\nD4 IFNmod",
+                                               "CD163+MRC1-\nD7 Control",
+                                               "CD163+MRC1-\nD7 IFNmod"
+                                     ))
+
+Idents(bal_lungref_sub) <- "Type_Day_Group"
+
+
+p1 <- DotPlot(bal_lungref_sub,dot.scale = 5, col.min = -2.5, col.max = 2.5, features = isg, assay = "RNA") + 
+  coord_flip(clip = "off") +
+  geom_point(aes(size=pct.exp), shape = 21, colour="black", stroke=0.5) +
+  # scale_y_discrete(labels = rep(c("Control","IFNmod"),24)) +
+  ylab("") +
+  xlab("ISGs") +
+  scale_y_discrete(labels = rep("",24)) +
+  scale_colour_gradient2(low = "blue", mid = "white", high = "red") +
+  theme(axis.text.x = element_text(size=11, color = "black",angle = 50,hjust = 1)) +
+  theme(axis.text.y = element_text(size=11, color = "black")) +
+  theme(axis.ticks.x = element_blank()) +
+  geom_hline(yintercept = seq(2.5,24,by=2), linetype="dashed") +
+  geom_hline(yintercept = seq(8.5,25,by=8)) +
+  geom_vline(xintercept = c(17.5,18.5)) +
+  #theme(plot.margin = unit(c(1,1,1,1), "cm")) +
+  annotate("text", x = 18, y = seq(1.5,24, by = 2), 
+           label = rep(c("baseline","2 dpi","4 dpi","7 dpi"),3)) +
+  annotate("text", x = 19, y = seq(4.5,24, by = 8), 
+           label = c("CD163+MRC1+","CD163+MRC1+TREM2+","CD163+MRC1-")) 
+
+p2 <- DotPlot(bal_lungref_sub,dot.scale = 5, col.min = -2.5, col.max = 2.5, features = cytokines, assay = "RNA") + 
+  coord_flip(clip = "off") +
+  geom_point(aes(size=pct.exp), shape = 21, colour="black", stroke=0.5) +
+  xlab("Inflammatory") +
+  scale_y_discrete(labels = rep(c(""),24)) +
+  scale_colour_gradient2(low = "blue", mid = "white", high = "red") +
+  theme(axis.text.x = element_text(size=11, color = "black",angle = 50,hjust = 1)) +
+  theme(axis.text.y = element_text(size=11, color = "black")) +
+  geom_hline(yintercept = seq(2.5,24,by=2), linetype="dashed") +
+  theme(axis.ticks.x = element_blank()) +
+  geom_hline(yintercept = seq(8.5,25,by=8)) +
+  geom_vline(xintercept = c(8.5)) +
+  # theme(plot.margin = unit(c(1,1,1,1), "cm")) +
+  annotate("text", x = 9, y = seq(1.5,24, by = 2), 
+          label = rep(c("baseline","2 dpi","4 dpi","7 dpi"),3)) +
+  annotate("text", x = 10, y = seq(4.5,24, by = 8), 
+          label = c("CD163+MRC1+","CD163+MRC1+TREM2+","CD163+MRC1-")) 
+
+p3 <- DotPlot(bal_lungref_sub,dot.scale = 5, col.min = -2.5, col.max = 2.5, features = chemokines, assay = "RNA") + 
+  coord_flip(clip = "off") +
+  geom_point(aes(size=pct.exp), shape = 21, colour="black", stroke=0.5) +
+  scale_y_discrete(labels = rep(c(""),24)) +
+  xlab("Chemokines") +
+  scale_colour_gradient2(low = "blue", mid = "white", high = "red") +
+  theme(axis.text.x = element_text(size=11, color = "black")) +
+  theme(axis.text.y = element_text(size=11, color = "black")) +
+  geom_hline(yintercept = seq(2.5,24,by=2), linetype="dashed") +
+  theme(axis.ticks.x = element_blank()) +
+  geom_hline(yintercept = seq(8.5,25,by=8)) +
+  geom_vline(xintercept = c(13.5)) +
+  # theme(plot.margin = unit(c(1,1,1,1), "cm")) +
+  annotate("text", x = 14, y = seq(1.5,24, by = 2), 
+          label = rep(c("baseline","2 dpi","4 dpi","7 dpi"),3)) +
+  annotate("text", x = 15, y = seq(4.5,24, by = 8), 
+          label = c("CD163+MRC1+","CD163+MRC1+TREM2+","CD163+MRC1-")) 
+
+
+
+p4 <- DotPlot(bal_lungref_sub,dot.scale = 5, col.min = -2.5, col.max = 2.5, features = inflammasome, assay = "RNA") + coord_flip(clip = "off") +
+  geom_point(aes(size=pct.exp), shape = 21, colour="black", stroke=0.5) +
+  scale_y_discrete(labels = rep(c("-","+"),24)) +
+  xlab("Inflammasome") +
+  scale_colour_gradient2(low = "blue", mid = "white", high = "red") +
+  theme(axis.text.x = element_text(size=14, color = rep(c("#ff8c69","#00578b"),13))) +
+  theme(axis.text.y = element_text(size=11, color = "black")) +
+  geom_hline(yintercept = seq(2.5,24,by=2), linetype="dashed") +
+  theme(axis.ticks.x = element_blank()) +
+  geom_hline(yintercept = seq(8.5,25,by=8)) +
+  geom_vline(xintercept = c(8.5)) +
+  # theme(plot.margin = unit(c(1,1,1,1), "cm")) +
+  annotate("text", x = 9, y = seq(1.5,24, by = 2), 
+          label = rep(c("baseline","2 dpi","4 dpi","7 dpi"),3)) +
+  annotate("text", x = 10, y = seq(4.5,24, by = 8), 
+          label = c("CD163+MRC1+","CD163+MRC1+TREM2+","CD163+MRC1-")) 
+
+l1 <- length(isg)  
+l2 <- length(cytokines) 
+l3 <- length(chemokines)
+l4 <- length(inflammasome)
+
+tot <- l1 + l2 + l3 + l4
+
+p <- p1 / p2 / p3 / p4  + plot_layout(heights = c(l1/tot,l2/tot,l3/tot,l4/tot))  & NoLegend()
+
+ggsave(plot = p, filename = "Macrophages_Dotplot_Main.pdf", height = 12, width = 8, units = "in")
+
+```
+
+```{r DE}
+
+# All cell types
+
+bal$CellType1 <- gsub("/","",bal$CellType)
+
+bal$Type_Time_Group1 <- paste0(bal$CellType1,"_",bal$Day,"_",bal$Treatment)
+Idents(bal) <- "Type_Time_Group1" 
+DefaultAssay(bal) <- "RNA"
+
+
+unique(bal$Type_Time_Group1)
+
+list_all_de <- list()
+list_all_de_sig <- list()
+
+get_de <- function(type){
+  print(type)
+  
+  if(length(bal$Type_Time_Group1[bal$Type_Time_Group1 == paste0(type,"_BL_IFNmod")]) > 3 &
+     length(bal$Type_Time_Group1[bal$Type_Time_Group1 == paste0(type,"_BL_Control")]) > 3){
+    
+    de_BL <- FindMarkers(bal, ident.1 = paste0(type,"_BL_Control"), ident.2= paste0(type,"_BL_IFNmod"),test.use = "MAST")
+    write.table(de_BL,paste0(type,"_BL_Control_IFNmod.txt"),quote=F,sep="\t")
+    list_all_de[[paste0(type,"_BL")]] <<- de_BL
+    
+    de_BL <- de_BL[de_BL$p_val_adj < 0.05 & abs(de_BL$avg_log2FC) >= log2(1.5),]
+    de_BL <- de_BL[order(de_BL$avg_log2FC,decreasing = T),]
+    write.table(de_BL,paste0(type,"_BL_Control_IFNmod_sig.txt"),quote=F,sep="\t")
+    list_all_de_sig[[paste0(type,"_BL")]] <<- de_BL
+  }
+  
+  if(length(bal$Type_Time_Group1[bal$Type_Time_Group1 == paste0(type,"_D2_IFNmod")]) > 3 &
+     length(bal$Type_Time_Group1[bal$Type_Time_Group1 == paste0(type,"_D2_Control")]) > 3){
+    
+    de_D2 <- FindMarkers(bal, ident.1 = paste0(type,"_D2_Control"), ident.2= paste0(type,"_D2_IFNmod"),test.use = "MAST")
+    write.table(de_D2,paste0(type,"_D2_Control_IFNmod.txt"),quote=F,sep="\t")
+    list_all_de[[paste0(type,"_D2")]] <<- de_D2
+    
+    de_D2 <- de_D2[de_D2$p_val_adj < 0.05 & abs(de_D2$avg_log2FC) >= log2(1.5),]
+    de_D2 <- de_D2[order(de_D2$avg_log2FC,decreasing = T),]
+    write.table(de_D2,paste0(type,"_D2_Control_IFNmod_sig.txt"),quote=F,sep="\t")
+    list_all_de_sig[[paste0(type,"_D2")]] <<- de_D2
+  }
+  
+  if(length(bal$Type_Time_Group1[bal$Type_Time_Group1 == paste0(type,"_D4_IFNmod")]) > 3 &
+     length(bal$Type_Time_Group1[bal$Type_Time_Group1 == paste0(type,"_D4_Control")]) > 3){
+    
+    de_D4 <- FindMarkers(bal, ident.1 = paste0(type,"_D4_Control"), ident.2= paste0(type,"_D4_IFNmod"),test.use = "MAST")
+    write.table(de_D4,paste0(type,"_D4_Control_IFNmod.txt"),quote=F,sep="\t")
+    list_all_de[[paste0(type,"_D4")]] <<- de_D4
+    
+    de_D4 <- de_D4[de_D4$p_val_adj < 0.05& abs(de_D4$avg_log2FC) >= log2(1.5),]
+    de_D4 <- de_D4[order(de_D4$avg_log2FC,decreasing = T),]
+    write.table(de_D4,paste0(type,"_D4_Control_IFNmod_sig.txt"),quote=F,sep="\t")
+    list_all_de_sig[[paste0(type,"_D4")]] <<- de_D4
+  }    
+  
+  if(length(bal$Type_Time_Group1[bal$Type_Time_Group1 == paste0(type,"_D7_IFNmod")]) > 3 &
+     length(bal$Type_Time_Group1[bal$Type_Time_Group1 == paste0(type,"_D7_Control")]) > 3){
+    
+    de_D7 <- FindMarkers(bal, ident.1 = paste0(type,"_D7_Control"), ident.2= paste0(type,"_D7_IFNmod"),test.use = "MAST")
+    write.table(de_D7,paste0(type,"_D7_Control_IFNmod.txt"),quote=F,sep="\t")
+    list_all_de[[paste0(type,"_D7")]] <<- de_D7
+    
+    de_D7 <- de_D7[de_D7$p_val_adj < 0.05& abs(de_D7$avg_log2FC) >= log2(1.5),]
+    de_D7 <- de_D7[order(de_D7$avg_log2FC,decreasing = T),]
+    write.table(de_D7,paste0(type,"_D7_Control_IFNmod_sig.txt"),quote=F,sep="\t")
+    list_all_de_sig[[paste0(type,"_D7")]] <<- de_D7
+  }    
+  
+}
+
+
+lapply(sort(as.character(unique(bal$CellType1))),get_de)
+
+names(list_all_de)
+saveRDS(list_all_de,"list_all_de.rds")
+
+names(list_all_de_sig)
+saveRDS(list_all_de_sig,"list_all_de_sig.rds")
+
+
+write.xlsx(list_all_de, file = "DE_single-cell_BAL_Control_vs_IFNmod.xlsx", rowNames=T)
+write.xlsx(list_all_de_sig, file = "DE_single-cell_Lungs_Control_vs_IFNmod_sig.xlsx", rowNames=T)
+
+# Macrophage subsets
+
+bal_lungref$predicted.celltype1 <- gsub(" Mac","",bal_lungref$predicted.celltype)
+
+bal_lungref$Type_Time_Group1 <- paste0(bal_lungref$predicted.celltype1,"_",bal_lungref$Day,"_",bal_lungref$Treatment)
+Idents(bal_lungref) <- "Type_Time_Group1" 
+DefaultAssay(bal_lungref) <- "RNA"
+
+unique(bal_lungref$Type_Time_Group1)
+
+list_macro_de <- list()
+list_macro_de_sig <- list()
+
+get_de <- function(type){
+  
+  print(type)
+  
+  if(length(bal_lungref$Type_Time_Group1[bal_lungref$Type_Time_Group1 == paste0(type,"_BL_IFNmod")]) > 3 &
+     length(bal_lungref$Type_Time_Group1[bal_lungref$Type_Time_Group1 == paste0(type,"_BL_Control")]) > 3){
+    
+    de_BL <- FindMarkers(bal_lungref, ident.1 = paste0(type,"_BL_Control"), ident.2= paste0(type,"_BL_IFNmod"),test.use = "MAST")
+    write.table(de_BL,paste0(type,"_BL_Control_IFNmod.txt"),quote=F,sep="\t")
+    list_macro_de[[paste0(type,"_BL")]] <<- de_BL
+    
+    de_BL <- de_BL[de_BL$p_val_adj < 0.05 & abs(de_BL$avg_log2FC) >= log2(1.5),]
+    de_BL <- de_BL[order(de_BL$avg_log2FC,decreasing = T),]
+    write.table(de_BL,paste0(type,"_BL_Control_IFNmod_sig.txt"),quote=F,sep="\t")
+    list_macro_de_sig[[paste0(type,"_BL")]] <<- de_BL
+  }
+  
+  if(length(bal_lungref$Type_Time_Group1[bal_lungref$Type_Time_Group1 == paste0(type,"_D2_IFNmod")]) > 3 &
+     length(bal_lungref$Type_Time_Group1[bal_lungref$Type_Time_Group1 == paste0(type,"_D2_Control")]) > 3){
+    
+    de_D2 <- FindMarkers(bal_lungref, ident.1 = paste0(type,"_D2_Control"), ident.2= paste0(type,"_D2_IFNmod"),test.use = "MAST")
+    write.table(de_D2,paste0(type,"_D2_Control_IFNmod.txt"),quote=F,sep="\t")
+    list_macro_de[[paste0(type,"_D2")]] <<- de_D2
+    
+    de_D2 <- de_D2[de_D2$p_val_adj < 0.05 & abs(de_D2$avg_log2FC) >= log2(1.5),]
+    de_D2 <- de_D2[order(de_D2$avg_log2FC,decreasing = T),]
+    write.table(de_D2,paste0(type,"_D2_Control_IFNmod_sig.txt"),quote=F,sep="\t")
+    list_macro_de_sig[[paste0(type,"_D2")]] <<- de_D2
+  }
+  
+  if(length(bal_lungref$Type_Time_Group1[bal_lungref$Type_Time_Group1 == paste0(type,"_D4_IFNmod")]) > 3 &
+     length(bal_lungref$Type_Time_Group1[bal_lungref$Type_Time_Group1 == paste0(type,"_D4_Control")]) > 3){
+    
+    de_D4 <- FindMarkers(bal_lungref, ident.1 = paste0(type,"_D4_Control"), ident.2= paste0(type,"_D4_IFNmod"),test.use = "MAST")
+    write.table(de_D4,paste0(type,"_D4_Control_IFNmod.txt"),quote=F,sep="\t")
+    list_macro_de[[paste0(type,"_D4")]] <<- de_D4
+    
+    de_D4 <- de_D4[de_D4$p_val_adj < 0.05& abs(de_D4$avg_log2FC) >= log2(1.5),]
+    de_D4 <- de_D4[order(de_D4$avg_log2FC,decreasing = T),]
+    write.table(de_D4,paste0(type,"_D4_Control_IFNmod_sig.txt"),quote=F,sep="\t")
+    list_macro_de_sig[[paste0(type,"_D4")]] <<- de_D4
+  }    
+  
+  if(length(bal_lungref$Type_Time_Group1[bal_lungref$Type_Time_Group1 == paste0(type,"_D7_IFNmod")]) > 3 &
+     length(bal_lungref$Type_Time_Group1[bal_lungref$Type_Time_Group1 == paste0(type,"_D7_Control")]) > 3){
+    
+    de_D7 <- FindMarkers(bal_lungref, ident.1 = paste0(type,"_D7_Control"), ident.2= paste0(type,"_D7_IFNmod"),test.use = "MAST")
+    write.table(de_D7,paste0(type,"_D7_Control_IFNmod.txt"),quote=F,sep="\t")
+    list_macro_de[[paste0(type,"_D7")]] <<- de_D7
+    
+    de_D7 <- de_D7[de_D7$p_val_adj < 0.05& abs(de_D7$avg_log2FC) >= log2(1.5),]
+    de_D7 <- de_D7[order(de_D7$avg_log2FC,decreasing = T),]
+    write.table(de_D7,paste0(type,"_D7_Control_IFNmod_sig.txt"),quote=F,sep="\t")
+    list_macro_de_sig[[paste0(type,"_D7")]] <<- de_D7
+  }    
+  
+}
+
+lapply(sort(as.character(unique(bal_lungref$predicted.celltype1))),get_de)
+
+names(list_macro_de)
+saveRDS(list_macro_de,"list_macro_de.rds")
+
+names(list_macro_de_sig)
+saveRDS(list_macro_de_sig,"list_macro_de_sig.rds")
+
+
+write.xlsx(c(list_all_de,list_macro_de), file = "DE_single-cell_BAL_Control_vs_IFNmod_sig.xlsx", rowNames=T)
+
+```
+
+```{r viral_reads}
+
+library("ggbreak")
+
+bal_lungref$Manual_Day_Treatment <- paste0(bal_lungref$Manual,"_",bal_lungref$Day_Treatment)
+bal_lungref$Manual_Day_Treatment <- factor(bal_lungref$Manual_Day_Treatment, levels = sort(unique(bal_lungref$Manual_Day_Treatment)))
+Idents(bal_lungref) <- "Manual_Day_Treatment"
+
+bal_lungref_d2 <- subset(bal_lungref,cells= row.names(bal_lungref@meta.data[bal_lungref$Day == "D2",]))
+bal_lungref_d2$Manual_Day_Treatment <- droplevels(bal_lungref_d2$Manual_Day_Treatment)
+unique(bal_lungref_d2$Manual_Day_Treatment)
+
+
+table(bal_lungref$predicted.celltype,bal_lungref$Day)
+
+Idents(bal_lungref_d2) <- "Manual_Day_Treatment"
+
+p1 <- rasterise(VlnPlot(bal_lungref_d2,"percent.cov2",pt.size = 0.4))  +
+  scale_x_discrete(labels = rep(c("-","+"),3)) +
+  scale_y_break(c(7.5,24.5)) +
+  theme(axis.text.x = element_text(angle = 0, size = 14)) +
+  theme(axis.text.y = element_text(angle = 0, size = 16)) +
+  theme(axis.text.x = element_text(size=14, color = rep(c("#ff8c69","#00578b"),13))) +
+  ylab("Percentage of viral reads\nin each cell") + ggtitle("Macrophages/Monocytes-2 dpi") +
+  theme(axis.text.y = element_text(size=11, color = "black")) +
+  theme(plot.margin = unit(c(1,1,1,1), "cm")) & NoLegend()
+
+p1
+
+ggsave(plot = p2, filename = "/data/runs/Analysis/CovTen_AU/BAL_2022_final2/Vln_viralreads_mac_D2_v3.pdf",
+       height = 3, width = 2, units = "in")
+
+
+
+
+
+bal_lungref_d2$CellType_Day_Treatment <- factor(bal_lungref_d2$CellType_Day_Treatment, levels = c("CD163+MRC1+_D2_Control","CD163+MRC1+_D2_IFnant","CD163+MRC1+TREM2+_D2_Control","CD163+MRC1+TREM2+_D2_IFnant","CD163+MRC1-_D2_Control","CD163+MRC1-_D2_IFnant"))
+unique(bal_lungref_d2$CellType_Day_Treatment)
+
+Idents(bal_lungref_d2) <- "CellType_Day_Treatment"
+
+
+p2 <- rasterise(VlnPlot(bal_lungref_d2,"percent.cov2",pt.size = 0.4))  +
+  scale_x_discrete(labels = rep(c("-","+"),3)) +
+  scale_y_break(c(7.5,24.5)) +
+  theme(axis.text.x = element_text(angle = 0, size = 14)) +
+  theme(axis.text.y = element_text(angle = 0, size = 14)) +
+  theme(axis.text.x = element_text(size=14, color = rep(c("#ff8c69","#00578b"),13))) +
+  ylab("Percentage of viral reads\nin each cell") + ggtitle("2 dpi") +
+  theme(axis.text.y = element_text(size=11, color = "black")) +
+  theme(plot.margin = unit(c(1,1,1,1), "cm")) & NoLegend()
+p2
+
+ggsave(plot = p2, filename = "/data/runs/Analysis/CovTen_AU/BAL_2022_final2/Vln_viralreads_macsubtypes_D2_v3.pdf",
+       height = 3, width = 6, units = "in")
+
+ 
+bal_lungref_nocd16$Manual_Day_Treatment <- paste0(bal_lungref_nocd16$Manual,"_",bal_lungref_nocd16$Day_Treatment)
+bal_lungref_nocd16$Manual_Day_Treatment <- factor(bal_lungref_nocd16$Manual_Day_Treatment, levels = sort(unique(bal_lungref_nocd16$Manual_Day_Treatment)))
+Idents(bal_lungref_nocd16) <- "Manual_Day_Treatment"
+
+p1 <- rasterise(VlnPlot(bal_lungref_nocd16,"percent.cov2",pt.size = 1)) + 
+  scale_x_discrete(labels = rep(c("-","+"),24)) +
+  scale_y_break(c(7.5,24.5)) +
+  theme(axis.text.x = element_text(angle = 0, size = 14)) +
+  theme(axis.text.y = element_text(angle = 0, size = 14)) +
+  theme(axis.text.x = element_text(size=14, color = rep(c("#ff8c69","#00578b"),13))) +
+  theme(axis.text.y = element_text(size=11, color = "black")) +
+  theme(plot.margin = unit(c(1,1,1,1), "cm"))  & NoLegend() 
+
+
+p1
+
+bal_lungref_nocd16$CellType_Day_Treatment <- factor(bal_lungref_nocd16$CellType_Day_Treatment, levels = c("CD163+MRC1+_BL_Control",
+                                                                                                          "CD163+MRC1+_BL_IFnant",
+                                                                                                          "CD163+MRC1+_D2_Control",
+                                                                                                          "CD163+MRC1+_D2_IFnant",
+                                                                                                          "CD163+MRC1+_D4_Control",
+                                                                                                          "CD163+MRC1+_D4_IFnant",
+                                                                                                          "CD163+MRC1+_D7_Control",
+                                                                                                          "CD163+MRC1+_D7_IFnant",
+                                                                                                          "CD163+MRC1+TREM2+_BL_Control",
+                                                                                                          "CD163+MRC1+TREM2+_BL_IFnant",
+                                                                                                          "CD163+MRC1+TREM2+_D2_Control",
+                                                                                                          "CD163+MRC1+TREM2+_D2_IFnant",
+                                                                                                          "CD163+MRC1+TREM2+_D4_Control",
+                                                                                                          "CD163+MRC1+TREM2+_D4_IFnant",
+                                                                                                          "CD163+MRC1+TREM2+_D7_Control",
+                                                                                                          "CD163+MRC1+TREM2+_D7_IFnant",
+                                                                                                          "CD163+MRC1-_BL_Control",
+                                                                                                          "CD163+MRC1-_BL_IFnant",
+                                                                                                          "CD163+MRC1-_D2_Control",
+                                                                                                          "CD163+MRC1-_D2_IFnant",
+                                                                                                          "CD163+MRC1-_D4_Control",
+                                                                                                          "CD163+MRC1-_D4_IFnant",
+                                                                                                          "CD163+MRC1-_D7_Control",
+                                                                                                          "CD163+MRC1-_D7_IFnant"
+                                                                                                          
+))
+
+bal_lungref_nocd16$CellType_Day_Treatment <- droplevels(bal_lungref_nocd16$CellType_Day_Treatment)
+
+Idents(bal_lungref_nocd16) <- "CellType_Day_Treatment"
+
+p1 <- rasterise(VlnPlot(bal_lungref_nocd16,"percent.cov2",pt.size = 1)) + 
+  scale_x_discrete(labels = rep(c("-","+"),24)) +
+  scale_y_break(c(7.5,24.5)) +
+  theme(axis.text.x = element_text(angle = 0, size = 14)) +
+  theme(axis.text.y = element_text(angle = 0, size = 14)) +
+  theme(axis.text.x = element_text(size=14, color = rep(c("#ff8c69","#00578b"),13))) +
+  theme(axis.text.y = element_text(size=11, color = "black")) & NoLegend() 
+
+
+p1
+
+ggsave(plot = p1, filename = "/data/runs/Analysis/CovTen_AU/BAL_2022_final2/Viralreads_BAL_macrophages_All_Supp.pdf", height= 6, width = 16, units = "in")
+
+```
